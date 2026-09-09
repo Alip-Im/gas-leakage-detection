@@ -3,6 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart'; // Pakej untuk Graf
 
 // ==========================================
 // 0. NOTIFICATION SERVICE CLASS
@@ -20,7 +22,6 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(initializationSettings);
 
-    // Minta kebenaran notifikasi untuk Android 13+
     _notificationsPlugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -35,7 +36,7 @@ class NotificationService {
         AndroidNotificationDetails(
       'gas_leak_channel',
       'Gas Leak Alerts',
-      channelDescription: 'Notifikasi amaran untuk kebocoran gas LPG',
+      channelDescription: 'Alert notifications for LPG gas leakages',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
@@ -55,6 +56,129 @@ class NotificationService {
 }
 
 // ==========================================
+// WIDGET GRAF REAL-TIME PPM
+// ==========================================
+class RealtimePpmChart extends StatefulWidget {
+  final int currentPpm;
+  final int threshold;
+
+  const RealtimePpmChart({
+    super.key,
+    required this.currentPpm,
+    required this.threshold,
+  });
+
+  @override
+  State<RealtimePpmChart> createState() => _RealtimePpmChartState();
+}
+
+class _RealtimePpmChartState extends State<RealtimePpmChart> {
+  final List<FlSpot> _ppmSpots = [];
+  int _timeIndex = 0;
+  final int _maxDataPoints = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _addPoint(widget.currentPpm);
+  }
+
+  @override
+  void didUpdateWidget(covariant RealtimePpmChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentPpm != widget.currentPpm || _ppmSpots.isEmpty) {
+      _addPoint(widget.currentPpm);
+    }
+  }
+
+  void _addPoint(int ppm) {
+    setState(() {
+      _timeIndex++;
+      _ppmSpots.add(FlSpot(_timeIndex.toDouble(), ppm.toDouble()));
+      if (_ppmSpots.length > _maxDataPoints) {
+        _ppmSpots.removeAt(0);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Real-Time PPM Trend Chart',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  titlesData: const FlTitlesData(
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: widget.threshold.toDouble(),
+                        color: Colors.red,
+                        strokeWidth: 2,
+                        dashArray: [5, 5],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topRight,
+                          style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold),
+                          labelResolver: (line) =>
+                              'Limit (${widget.threshold})',
+                        ),
+                      ),
+                    ],
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: _ppmSpots,
+                      isCurved: true,
+                      color: widget.currentPpm >= widget.threshold
+                          ? Colors.red
+                          : Colors.indigo,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: (widget.currentPpm >= widget.threshold
+                                ? Colors.red
+                                : Colors.indigo)
+                            .withOpacity(0.15),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
 // MAIN FUNCTION
 // ==========================================
 void main() async {
@@ -64,7 +188,8 @@ void main() async {
     options: const FirebaseOptions(
       apiKey: "AIzaSyC54U2VaMpbgiNGmcaIhvWwOnS157xrojs",
       authDomain: "gas-leakage-detection-9391e.firebaseapp.com",
-      databaseURL: "https://gas-leakage-detection-9391e-default-rtdb.firebaseio.com",
+      databaseURL:
+          "https://gas-leakage-detection-9391e-default-rtdb.firebaseio.com",
       projectId: "gas-leakage-detection-9391e",
       storageBucket: "gas-leakage-detection-9391e.firebasestorage.app",
       messagingSenderId: "146541742460",
@@ -73,7 +198,6 @@ void main() async {
     ),
   );
 
-  // Inisialisasi Perkhidmatan Notifikasi Local
   await NotificationService.init();
 
   runApp(const GasLeakApp());
@@ -163,7 +287,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 const Text(
                   'Gas Leakage Detector',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo),
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo),
                 ),
                 const SizedBox(height: 32),
                 TextField(
@@ -191,7 +318,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const ForgotPasswordScreen()),
                       );
                     },
                     child: const Text('Forgot Password?'),
@@ -206,7 +334,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('LOG IN', style: TextStyle(color: Colors.white, fontSize: 16)),
+                      : const Text('LOG IN',
+                          style: TextStyle(color: Colors.white, fontSize: 16)),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -217,7 +346,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const RegisterScreen()),
                         );
                       },
                       child: const Text('Register Here'),
@@ -303,7 +433,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('REGISTER ACCOUNT', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  : const Text('REGISTER ACCOUNT',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
             ),
           ],
         ),
@@ -324,10 +455,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Future<void> _resetPassword() async {
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text.trim());
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: _emailController.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password reset link has been sent to your email.')),
+          const SnackBar(
+              content: Text('Password reset link has been sent to your email.')),
         );
         Navigator.pop(context);
       }
@@ -369,7 +502,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: Colors.indigo,
               ),
-              child: const Text('SEND RESET EMAIL', style: TextStyle(color: Colors.white, fontSize: 16)),
+              child: const Text('SEND RESET EMAIL',
+                  style: TextStyle(color: Colors.white, fontSize: 16)),
             ),
           ],
         ),
@@ -393,6 +527,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
+    const HistoryLogScreen(),
     const SettingsScreen(),
     const UserProfileScreen(),
   ];
@@ -404,11 +539,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.indigo,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.tune), label: 'Settings'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.tune), label: 'Settings'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
@@ -416,7 +558,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 }
 
 // ==========================================
-// 4. DASHBOARD SCREEN WITH NOTIFICATION
+// 4. DASHBOARD SCREEN WITH REAL-TIME GRAPH
 // ==========================================
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -427,16 +569,18 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref('gas_sensor');
-  bool _hasNotified = false; // Flag elak notifikasi spam berulang-kali
+  final DatabaseReference _historyRef =
+      FirebaseDatabase.instance.ref('gas_leak_history');
+  bool _hasNotified = false;
 
   void _toggleFan(bool currentValue) {
     _dbRef.update({'fan_status': !currentValue});
   }
 
   String _calculateStatus(int ppm, int threshold) {
-    if (ppm >= threshold) return 'Danger';
-    if (ppm > threshold * 0.5) return 'Warning';
-    return 'Safe';
+    if (ppm >= threshold) return 'DANGER';
+    if (ppm > threshold * 0.5) return 'WARNING';
+    return 'SAFE';
   }
 
   Color _getStatusColor(int ppm, int threshold) {
@@ -445,13 +589,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Colors.green;
   }
 
+  Future<void> _logLeakIncident(int ppmLevel) async {
+    final now = DateTime.now();
+    final formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+
+    await _historyRef.push().set({
+      'ppm_level': ppmLevel,
+      'timestamp': formattedDate,
+      'status': 'DANGER',
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gas Leakage Detector', style: TextStyle(color: Colors.white)),
+        title: const Text('Gas Leakage Detector',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo,
         actions: [
           IconButton(
@@ -463,7 +619,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: StreamBuilder(
         stream: _dbRef.onValue,
         builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-          if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -477,17 +635,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final bool isOnline = data?['is_online'] ?? false;
           final String lastSeen = data?['last_seen']?.toString() ?? 'N/A';
 
-          // LOGIK PENCETUS NOTIFIKASI AUTOMATIK
           if (ppm >= threshold) {
             if (!_hasNotified) {
               NotificationService.showGasAlertNotification(
-                title: '🚨 AMARAN KEBOCORAN GAS!',
-                body: 'Kepekatan gas LPG telah mencapai $ppm PPM! Sila periksa lokasi anda.',
+                title: '🚨 GAS LEAKAGE WARNING!',
+                body:
+                    'Gas concentration reached $ppm PPM! Take immediate action.',
               );
+              _logLeakIncident(ppm);
               _hasNotified = true;
             }
           } else {
-            _hasNotified = false; // Reset jika kembali ke zon selamat
+            _hasNotified = false;
           }
 
           return SingleChildScrollView(
@@ -495,14 +654,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Hardware Connection Health Badge
+                // Connection Status
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: isOnline ? Colors.green.shade50 : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isOnline ? Colors.green.shade300 : Colors.red.shade300,
+                      color: isOnline
+                          ? Colors.green.shade300
+                          : Colors.red.shade300,
                     ),
                   ),
                   child: Row(
@@ -520,14 +682,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             isOnline ? 'Hardware: ONLINE' : 'Hardware: OFFLINE',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: isOnline ? Colors.green.shade900 : Colors.red.shade900,
+                              color: isOnline
+                                  ? Colors.green.shade900
+                                  : Colors.red.shade900,
                             ),
                           ),
                         ],
                       ),
                       Text(
                         'Last Seen: $lastSeen',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -536,19 +701,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 Text(
                   'Logged in as: ${user?.email ?? 'Unknown'}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
 
-                // Card Concentration Gas
+                // Gas PPM Card
                 Card(
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
                       children: [
-                        const Text('Current Gas Concentration', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        const Text('Current Gas Concentration',
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.grey)),
                         const SizedBox(height: 10),
                         Text(
                           '$ppm PPM',
@@ -562,7 +731,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Chip(
                           label: Text(
                             status,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                           backgroundColor: _getStatusColor(ppm, threshold),
                         ),
@@ -572,10 +743,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Card Exhaust Fan & Buzzer
+                // GRAF REAL-TIME DIPANGGIL DI SINI
+                RealtimePpmChart(
+                  currentPpm: ppm,
+                  threshold: threshold,
+                ),
+                const SizedBox(height: 16),
+
+                // Exhaust Fan Card
                 Card(
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
@@ -591,7 +770,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   size: 28,
                                 ),
                                 const SizedBox(width: 10),
-                                const Text('Exhaust Fan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                const Text('Exhaust Fan',
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
                               ],
                             ),
                             Switch(
@@ -630,7 +812,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // ==========================================
-// 5. SETTINGS SCREEN
+// 5. HISTORY LOG SCREEN
+// ==========================================
+class HistoryLogScreen extends StatelessWidget {
+  const HistoryLogScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final DatabaseReference historyRef =
+        FirebaseDatabase.instance.ref('gas_leak_history');
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gas Leakage History',
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.indigo,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep, color: Colors.white),
+            tooltip: 'Clear History',
+            onPressed: () async {
+              await historyRef.remove();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('History log cleared.')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: StreamBuilder(
+        stream: historyRef.onValue,
+        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+
+          if (data == null || data.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history_toggle_off,
+                      size: 64, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('No gas leakage incidents recorded yet.',
+                      style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+
+          final List<Map<String, dynamic>> logs = [];
+          data.forEach((key, value) {
+            logs.add({
+              'id': key,
+              'ppm_level': value['ppm_level'] ?? 0,
+              'timestamp': value['timestamp'] ?? 'N/A',
+              'status': value['status'] ?? 'DANGER',
+            });
+          });
+
+          logs.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12.0),
+            itemCount: logs.length,
+            itemBuilder: (context, index) {
+              final log = logs[index];
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6.0),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.red,
+                    child: Icon(Icons.warning, color: Colors.white),
+                  ),
+                  title: Text(
+                    'Gas Leakage Detected (${log['ppm_level']} PPM)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text('Time: ${log['timestamp']}'),
+                  trailing: const Chip(
+                    label: Text('DANGER',
+                        style: TextStyle(color: Colors.white, fontSize: 10)),
+                    backgroundColor: Colors.red,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 6. SETTINGS SCREEN
 // ==========================================
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -648,7 +933,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (newLimit != null) {
       _dbRef.update({'threshold_limit': newLimit});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Threshold updated successfully in Firebase!')),
+        const SnackBar(
+            content: Text('Threshold updated successfully in Firebase!')),
       );
       _thresholdController.clear();
     }
@@ -658,7 +944,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('System Settings', style: TextStyle(color: Colors.white)),
+        title: const Text('System Settings',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo,
       ),
       body: Padding(
@@ -666,9 +953,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Safety Limit Control (Threshold)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Safety Limit Control (Threshold)',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('Update the PPM limit value to trigger automatic alerts and exhaust fan activation.', style: TextStyle(color: Colors.grey)),
+            const Text(
+                'Update the PPM limit value to trigger automatic alerts and exhaust fan activation.',
+                style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             TextField(
               controller: _thresholdController,
@@ -686,7 +976,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: Colors.indigo,
               ),
-              child: const Text('SAVE SETTINGS', style: TextStyle(color: Colors.white, fontSize: 16)),
+              child: const Text('SAVE SETTINGS',
+                  style: TextStyle(color: Colors.white, fontSize: 16)),
             ),
           ],
         ),
@@ -696,7 +987,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// 6. USER PROFILE SCREEN
+// 7. USER PROFILE SCREEN
 // ==========================================
 class UserProfileScreen extends StatelessWidget {
   const UserProfileScreen({super.key});
@@ -722,7 +1013,8 @@ class UserProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               user?.email ?? 'No Email',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Chip(
@@ -738,16 +1030,17 @@ class UserProfileScreen extends StatelessWidget {
               title: const Text('User ID (UID)'),
               subtitle: Text(user?.uid ?? '-'),
             ),
-            const ListTile(
-              leading: Icon(Icons.security),
-              title: Text('FYP System'),
-              subtitle: Text('Gas Leakage Detector v1.0'),
+            ListTile(
+              leading: const Icon(Icons.security),
+              title: const Text('FYP System'),
+              subtitle: const Text('Gas Leakage Detector v1.0'),
             ),
             const Spacer(),
             ElevatedButton.icon(
               onPressed: () => FirebaseAuth.instance.signOut(),
               icon: const Icon(Icons.logout, color: Colors.white),
-              label: const Text('LOG OUT', style: TextStyle(color: Colors.white)),
+              label: const Text('LOG OUT',
+                  style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
                 backgroundColor: Colors.red,

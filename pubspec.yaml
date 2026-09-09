@@ -21,6 +21,8 @@ dependencies:
 
   # Local Notification Package
   flutter_local_notifications: ^17.2.1
+  intl: ^0.19.0
+  fl_chart: ^0.68.0
 
 dev_dependencies:
   flutter_test:
