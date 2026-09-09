@@ -1,0 +1,31 @@
+name: flutter_application_1
+description: "A new Flutter project for Gas Leakage Detector."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Cupertino Icons
+  cupertino_icons: ^1.0.8
+
+  # Firebase Packages
+  firebase_core: ^3.12.1
+  firebase_database: ^11.3.1
+  firebase_auth: ^5.5.1
+
+  # Local Notification Package
+  flutter_local_notifications: ^17.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
