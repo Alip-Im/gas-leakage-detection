@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "146541742460",
+    "firebase_url": "https://gas-leakage-detection-9391e-default-rtdb.firebaseio.com",
+    "project_id": "gas-leakage-detection-9391e",
+    "storage_bucket": "gas-leakage-detection-9391e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:146541742460:android:e1edcfffc1ecbb1dbcbcf9",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCv5pp3g6a8Hm60BgZZ7kbmy0bizgqv5j4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
