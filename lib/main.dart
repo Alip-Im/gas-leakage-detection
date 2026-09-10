@@ -4,7 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart'; // Pakej untuk Graf
+import 'package:fl_chart/fl_chart.dart';
 
 // ==========================================
 // 0. NOTIFICATION SERVICE CLASS
@@ -743,7 +743,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // GRAF REAL-TIME DIPANGGIL DI SINI
+                // Real-Time Graph
                 RealtimePpmChart(
                   currentPpm: ppm,
                   threshold: threshold,
@@ -915,82 +915,168 @@ class HistoryLogScreen extends StatelessWidget {
 }
 
 // ==========================================
-// 6. SETTINGS SCREEN
+// 6. SETTINGS SCREEN (READ-ONLY FOR USERS)
 // ==========================================
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref('gas_sensor');
-  final _thresholdController = TextEditingController();
-
-  void _updateThreshold() {
-    final newLimit = int.tryParse(_thresholdController.text.trim());
-    if (newLimit != null) {
-      _dbRef.update({'threshold_limit': newLimit});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Threshold updated successfully in Firebase!')),
-      );
-      _thresholdController.clear();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final DatabaseReference dbRef = FirebaseDatabase.instance.ref('gas_sensor');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('System Settings',
             style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Safety Limit Control (Threshold)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text(
-                'Update the PPM limit value to trigger automatic alerts and exhaust fan activation.',
-                style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _thresholdController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'New Threshold Value (PPM)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.warning_amber_rounded),
-              ),
+      body: StreamBuilder(
+        stream: dbRef.onValue,
+        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+          final int threshold = data?['threshold_limit'] ?? 1000;
+
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'System Configuration',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Threshold limits are managed by system administrators. Below are the current active configurations.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 20),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.indigo,
+                      child: Icon(Icons.admin_panel_settings, color: Colors.white),
+                    ),
+                    title: const Text('Safety Limit (Threshold)',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Triggers automatic alarm & exhaust fan'),
+                    trailing: Text(
+                      '$threshold PPM',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _updateThreshold,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                backgroundColor: Colors.indigo,
-              ),
-              child: const Text('SAVE SETTINGS',
-                  style: TextStyle(color: Colors.white, fontSize: 16)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
 // ==========================================
-// 7. USER PROFILE SCREEN
+// USER PROFILE SCREEN (SIMPLE ADDRESS ONLY)
 // ==========================================
-class UserProfileScreen extends StatelessWidget {
+class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
+
+  @override
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
+}
+
+class _UserProfileScreenState extends State<UserProfileScreen> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _postcodeController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+
+  bool _isLoading = false;
+  bool _isFetching = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  // MENGAMBIL DATA PROFIL DARI FIREBASE
+  Future<void> _loadUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final ref = FirebaseDatabase.instance.ref('users/${user.uid}');
+      final snapshot = await ref.get();
+
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        setState(() {
+          _nameController.text = data['full_name'] ?? '';
+          _phoneController.text = data['phone_number'] ?? '';
+          _addressController.text = data['address_line'] ?? '';
+          _postcodeController.text = data['postcode'] ?? '';
+          _cityController.text = data['city'] ?? '';
+          _stateController.text = data['state'] ?? '';
+        });
+      }
+    }
+    setState(() => _isFetching = false);
+  }
+
+  // MENYIMPAN DATA PROFIL KE FIREBASE
+  Future<void> _saveUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final ref = FirebaseDatabase.instance.ref('users/${user.uid}');
+      await ref.set({
+        'full_name': _nameController.text.trim(),
+        'phone_number': _phoneController.text.trim(),
+        'address_line': _addressController.text.trim(),
+        'postcode': _postcodeController.text.trim(),
+        'city': _cityController.text.trim(),
+        'state': _stateController.text.trim(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -998,57 +1084,149 @@ class UserProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Profile', style: TextStyle(color: Colors.white)),
+        title: const Text('Manage Profile',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.indigo,
-              child: Icon(Icons.person, size: 60, color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              user?.email ?? 'No Email',
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Chip(
-              label: Text(
-                user?.emailVerified == true ? 'Email Verified' : 'Standard User',
-                style: const TextStyle(color: Colors.white),
+      body: _isFetching
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User Avatar Header
+                  Center(
+                    child: Column(
+                      children: [
+                        const CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.indigo,
+                          child: Icon(Icons.person, size: 50, color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          user?.email ?? 'No Email',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Personal Information Section
+                  const Text(
+                    'Personal Information',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      prefixIcon: Icon(Icons.person_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      prefixIcon: Icon(Icons.phone),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Location & Address Section
+                  const Text(
+                    'Location & Address Details',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Street Address',
+                      prefixIcon: Icon(Icons.home),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _postcodeController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Postcode',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _cityController,
+                          decoration: const InputDecoration(
+                            labelText: 'City',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _stateController,
+                    decoration: const InputDecoration(
+                      labelText: 'State',
+                      prefixIcon: Icon(Icons.map),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Save Profile Button
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveUserProfile,
+                    icon: const Icon(Icons.save, color: Colors.white),
+                    label: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('SAVE PROFILE',
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 16)),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Logout Button
+                  OutlinedButton.icon(
+                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    icon: const Icon(Icons.logout, color: Colors.red),
+                    label: const Text('LOG OUT',
+                        style: TextStyle(color: Colors.red)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ],
               ),
-              backgroundColor: Colors.green,
             ),
-            const Divider(height: 40),
-            ListTile(
-              leading: const Icon(Icons.verified_user),
-              title: const Text('User ID (UID)'),
-              subtitle: Text(user?.uid ?? '-'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.security),
-              title: const Text('FYP System'),
-              subtitle: const Text('Gas Leakage Detector v1.0'),
-            ),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: () => FirebaseAuth.instance.signOut(),
-              icon: const Icon(Icons.logout, color: Colors.white),
-              label: const Text('LOG OUT',
-                  style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                backgroundColor: Colors.red,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
