@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'firebase_options.dart';
 import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
@@ -10,18 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyC54U2VaMpbgiNGmcaIhvWwOnS157xrojs",
-      authDomain: "gas-leakage-detection-9391e.firebaseapp.com",
-      databaseURL:
-          "https://gas-leakage-detection-9391e-default-rtdb.firebaseio.com",
-      projectId: "gas-leakage-detection-9391e",
-      storageBucket:
-          "gas-leakage-detection-9391e.firebasestorage.app",
-      messagingSenderId: "146541742460",
-      appId: "1:146541742460:web:65bb6176e2f5e58fbcbcf9",
-      measurementId: "G-QXMSTK50MR",
-    ),
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   await NotificationService.init();
@@ -54,8 +44,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),

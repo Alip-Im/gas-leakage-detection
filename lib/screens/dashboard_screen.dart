@@ -20,49 +20,185 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DatabaseReference _historyRef =
       FirebaseDatabase.instance.ref('gas_leak_history');
 
-  bool _hasNotified = false;
+  int _gasLevel = 0;
+  int _threshold = 1000;
 
-  void _toggleFan(bool currentValue) {
-    _dbRef.update({
-      'fan_status': !currentValue,
+  bool _fanOn = false;
+  bool _buzzerOn = false;
+  bool _hardwareOnline = false;
+
+  String _lastSeen = 'N/A';
+
+  bool _dangerNotificationSent = false;
+
+  // DARK GREEN THEME
+  static const Color darkGreen = Color(0xFF0B261B);
+  static const Color mediumGreen = Color(0xFF174C36);
+  static const Color mainGreen = Color(0xFF216B4A);
+  static const Color softGreen = Color(0xFFC7D9CF);
+  static const Color backgroundGreen = Color(0xFFD6E1DB);
+  static const Color cardGreen = Color(0xFFE3EBE6);
+  static const Color borderGreen = Color(0xFF9FAFA5);
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToGasSensor();
+  }
+
+  void _listenToGasSensor() {
+    _dbRef.onValue.listen((event) {
+      if (!mounted) return;
+
+      final data = event.snapshot.value;
+
+      if (data is Map) {
+        final map = Map<dynamic, dynamic>.from(data);
+
+        final int newGasLevel =
+            _toInt(map['ppm'] ?? map['gas_level'] ?? map['gasLevel']);
+
+        final int newThreshold =
+            _toInt(map['threshold_limit'] ?? map['threshold']);
+
+        final bool newFanStatus =
+            _toBool(map['fan_status'] ?? map['fan']);
+
+        final bool newBuzzerStatus =
+            _toBool(map['buzzer_status'] ?? map['buzzer']);
+
+        final bool newHardwareStatus =
+            _toBool(map['online'] ?? map['hardware_status']);
+
+        final dynamic lastSeenValue = map['last_seen'];
+
+        setState(() {
+          _gasLevel = newGasLevel;
+
+          if (newThreshold > 0) {
+            _threshold = newThreshold;
+          }
+
+          _fanOn = newFanStatus;
+          _buzzerOn = newBuzzerStatus;
+          _hardwareOnline = newHardwareStatus;
+
+          if (lastSeenValue != null) {
+            _lastSeen = lastSeenValue.toString();
+          }
+        });
+
+        _checkDangerStatus();
+      }
     });
   }
 
-  String _calculateStatus(int ppm, int threshold) {
-    if (ppm >= threshold) {
+  int _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is double) {
+      return value.round();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool _toBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is int) {
+      return value == 1;
+    }
+
+    if (value is String) {
+      return value.toLowerCase() == 'true' ||
+          value.toLowerCase() == 'on' ||
+          value == '1';
+    }
+
+    return false;
+  }
+
+  void _checkDangerStatus() {
+    if (_gasLevel >= _threshold) {
+      if (!_dangerNotificationSent) {
+        _dangerNotificationSent = true;
+
+        NotificationService.showGasAlertNotification(
+          title: 'Gas Leakage Warning',
+          body: 'Dangerous LPG level detected: $_gasLevel PPM',
+        );
+
+        _saveDangerHistory();
+      }
+    } else {
+      _dangerNotificationSent = false;
+    }
+  }
+
+  Future<void> _saveDangerHistory() async {
+    final String timestamp =
+        DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+
+    await _historyRef.push().set({
+      'ppm': _gasLevel,
+      'status': 'DANGER',
+      'timestamp': timestamp,
+    });
+  }
+
+  Future<void> _toggleFan(bool value) async {
+    await _dbRef.update({
+      'fan_status': value,
+    });
+
+    if (mounted) {
+      setState(() {
+        _fanOn = value;
+      });
+    }
+  }
+
+  String get _gasStatus {
+    if (_gasLevel >= _threshold) {
       return 'DANGER';
     }
 
-    if (ppm > threshold * 0.5) {
+    if (_gasLevel >= (_threshold * 0.7)) {
       return 'WARNING';
     }
 
     return 'SAFE';
   }
 
-  Color _getStatusColor(int ppm, int threshold) {
-    if (ppm >= threshold) {
-      return Colors.red;
-    }
+  Color get _statusColor {
+    switch (_gasStatus) {
+      case 'DANGER':
+        return const Color(0xFFB3261E);
 
-    if (ppm > threshold * 0.5) {
-      return Colors.orange;
-    }
+      case 'WARNING':
+        return const Color(0xFFC17A00);
 
-    return Colors.green;
+      default:
+        return const Color(0xFF1B5E20);
+    }
   }
 
-  Future<void> _logLeakIncident(int ppmLevel) async {
-    final now = DateTime.now();
+  Color get _statusBackgroundColor {
+    switch (_gasStatus) {
+      case 'DANGER':
+        return const Color(0xFFE7C1BE);
 
-    final formattedDate =
-        DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+      case 'WARNING':
+        return const Color(0xFFE4D2A6);
 
-    await _historyRef.push().set({
-      'ppm_level': ppmLevel,
-      'timestamp': formattedDate,
-      'status': 'DANGER',
-    });
+      default:
+        return const Color(0xFFBFD5C4);
+    }
   }
 
   @override
@@ -70,324 +206,421 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: backgroundGreen,
+
+appBar: AppBar(
+  backgroundColor: Colors.white,
+  foregroundColor: const Color(0xFF0B261B),
+  elevation: 0,
         title: const Text(
           'Gas Leakage Detector',
           style: TextStyle(
-            color: Colors.white,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        backgroundColor: Colors.indigo,
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.logout,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
             },
+            icon: const Icon(
+              Icons.logout_rounded,
+            ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: StreamBuilder<DatabaseEvent>(
-        stream: _dbRef.onValue,
-        builder: (
-          context,
-          AsyncSnapshot<DatabaseEvent> snapshot,
-        ) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
+
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // HARDWARE STATUS
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 15,
               ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          final data = snapshot.data?.snapshot.value
-              as Map<dynamic, dynamic>?;
-
-          final int ppm = data?['ppm'] ?? 0;
-
-          final int threshold =
-              data?['threshold_limit'] ?? 1000;
-
-          final String status =
-              _calculateStatus(ppm, threshold);
-
-          final bool isFanOn =
-              data?['fan_status'] ?? false;
-
-          final bool isBuzzerOn =
-              data?['buzzer_status'] ?? false;
-
-          final bool isOnline =
-              data?['is_online'] ?? false;
-
-          final String lastSeen =
-              data?['last_seen']?.toString() ?? 'N/A';
-
-          if (ppm >= threshold) {
-            if (!_hasNotified) {
-              NotificationService.showGasAlertNotification(
-                title: '🚨 GAS LEAKAGE WARNING!',
-                body:
-                    'Gas concentration reached $ppm PPM! Take immediate action.',
-              );
-
-              _logLeakIncident(ppm);
-
-              _hasNotified = true;
-            }
-          } else {
-            _hasNotified = false;
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
-              children: [
-                // Connection Status
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isOnline
-                        ? Colors.green.shade50
-                        : Colors.red.shade50,
-                    borderRadius:
-                        BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isOnline
-                          ? Colors.green.shade300
-                          : Colors.red.shade300,
+              decoration: BoxDecoration(
+                color: _hardwareOnline
+                    ? const Color(0xFFB8CFBF)
+                    : const Color(0xFFDAB7B7),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _hardwareOnline
+                      ? const Color(0xFF4D8061)
+                      : const Color(0xFF9A4F4A),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _hardwareOnline
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFB3261E),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.circle,
-                            size: 14,
-                            color: isOnline
-                                ? Colors.green
-                                : Colors.red,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isOnline
-                                ? 'Hardware: ONLINE'
-                                : 'Hardware: OFFLINE',
-                            style: TextStyle(
-                              fontWeight:
-                                  FontWeight.bold,
-                              color: isOnline
-                                  ? Colors
-                                      .green.shade900
-                                  : Colors
-                                      .red.shade900,
-                            ),
-                          ),
-                        ],
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: Text(
+                      _hardwareOnline
+                          ? 'Hardware: ONLINE'
+                          : 'Hardware: OFFLINE',
+                      style: TextStyle(
+                        color: _hardwareOnline
+                            ? darkGreen
+                            : const Color(0xFF7A1D19),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      Text(
-                        'Last Seen: $lastSeen',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                    ),
+                  ),
+
+                  Text(
+                    'Last Seen: $_lastSeen',
+                    style: const TextStyle(
+                      color: Color(0xFF4A5750),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Logged in as: ${user?.email ?? 'User'}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF3F4C45),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // GAS LEVEL CARD
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 28,
+              ),
+              decoration: BoxDecoration(
+                color: cardGreen,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: borderGreen,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: softGreen,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.air_rounded,
+                      color: darkGreen,
+                      size: 30,
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  const Text(
+                    'Current Gas Concentration',
+                    style: TextStyle(
+                      color: Color(0xFF3C4942),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Text(
+                    '$_gasLevel PPM',
+                    style: TextStyle(
+                      color: _statusColor,
+                      fontSize: 42,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _statusColor,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      _gasStatus,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.6,
                       ),
-                    ],
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 18),
 
-                Text(
-                  'Logged in as: ${user?.email ?? 'Unknown'}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Gas PPM Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.all(20.0),
-                    child: Column(
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _statusBackgroundColor,
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: _statusColor.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Current Gas Concentration',
+                        Icon(
+                          _gasStatus == 'DANGER'
+                              ? Icons.warning_rounded
+                              : _gasStatus == 'WARNING'
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.check_circle_outline,
+                          color: _statusColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _gasStatus == 'DANGER'
+                              ? 'Dangerous gas level detected'
+                              : _gasStatus == 'WARNING'
+                                  ? 'Gas level is increasing'
+                                  : 'Gas level is within safe range',
+                          style: TextStyle(
+                            color: _statusColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // REAL-TIME GRAPH
+            RealtimePpmChart(
+              currentPpm: _gasLevel,
+              threshold: _threshold,
+            ),
+
+            const SizedBox(height: 18),
+
+            // EXHAUST FAN CARD
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: cardGreen,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: borderGreen,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: softGreen,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Icon(
+                      Icons.air,
+                      color: darkGreen,
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Exhaust Fan',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            color: darkGreen,
                           ),
                         ),
-
-                        const SizedBox(height: 10),
-
+                        SizedBox(height: 3),
                         Text(
-                          '$ppm PPM',
+                          'Ventilation control',
                           style: TextStyle(
-                            fontSize: 44,
-                            fontWeight:
-                                FontWeight.bold,
-                            color:
-                                _getStatusColor(
-                              ppm,
-                              threshold,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Chip(
-                          label: Text(
-                            status,
-                            style:
-                                const TextStyle(
-                              color: Colors.white,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
-                          backgroundColor:
-                              _getStatusColor(
-                            ppm,
-                            threshold,
+                            fontSize: 12,
+                            color: Color(0xFF5B665F),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 16),
-
-                // Real-Time Graph
-                RealtimePpmChart(
-                  currentPpm: ppm,
-                  threshold: threshold,
-                ),
-
-                const SizedBox(height: 16),
-
-                // Exhaust Fan Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment
-                                  .spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons
-                                      .mode_fan_off_outlined,
-                                  color: isFanOn
-                                      ? Colors.blue
-                                      : Colors.grey,
-                                  size: 28,
-                                ),
-                                const SizedBox(
-                                  width: 10,
-                                ),
-                                const Text(
-                                  'Exhaust Fan',
-                                  style:
-                                      TextStyle(
-                                    fontSize: 18,
-                                    fontWeight:
-                                        FontWeight
-                                            .bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Switch(
-                              value: isFanOn,
-                              activeTrackColor:
-                                  Colors
-                                      .blue
-                                      .shade200,
-                              activeThumbColor:
-                                  Colors.blue,
-                              onChanged: (_) {
-                                _toggleFan(
-                                    isFanOn);
-                              },
-                            ),
-                          ],
-                        ),
-
-                        const Divider(),
-
-                        Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment
-                                  .spaceBetween,
-                          children: [
-                            Text(
-                              'Alert Threshold: $threshold PPM',
-                            ),
-                            Text(
-                              'Buzzer: ${isBuzzerOn ? "ON" : "OFF"}',
-                              style:
-                                  TextStyle(
-                                fontWeight:
-                                    FontWeight
-                                        .bold,
-                                color:
-                                    isBuzzerOn
-                                        ? Colors
-                                            .red
-                                        : Colors
-                                            .grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  Text(
+                    _fanOn ? 'ON' : 'OFF',
+                    style: TextStyle(
+                      color: _fanOn
+                          ? mediumGreen
+                          : const Color(0xFF616A65),
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-              ],
+
+                  Switch(
+                    value: _fanOn,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: mainGreen,
+                    inactiveThumbColor: const Color(0xFF67726B),
+                    inactiveTrackColor: const Color(0xFFB8C4BD),
+                    onChanged: _toggleFan,
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+
+            const SizedBox(height: 14),
+
+            // DANGER THRESHOLD
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: cardGreen,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: borderGreen,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.speed_rounded,
+                    color: darkGreen,
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  const Expanded(
+                    child: Text(
+                      'Danger Threshold',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: darkGreen,
+                      ),
+                    ),
+                  ),
+
+                  Text(
+                    '$_threshold PPM',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: mediumGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // BUZZER
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: cardGreen,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: borderGreen,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _buzzerOn
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_none_rounded,
+                    color: _buzzerOn
+                        ? const Color(0xFFB3261E)
+                        : darkGreen,
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  const Expanded(
+                    child: Text(
+                      'Buzzer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: darkGreen,
+                      ),
+                    ),
+                  ),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _buzzerOn
+                          ? const Color(0xFFDAB7B7)
+                          : softGreen,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      _buzzerOn ? 'ON' : 'OFF',
+                      style: TextStyle(
+                        color: _buzzerOn
+                            ? const Color(0xFF8C221D)
+                            : darkGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 25),
+          ],
+        ),
       ),
     );
   }
