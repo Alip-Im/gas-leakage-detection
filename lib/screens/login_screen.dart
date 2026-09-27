@@ -18,6 +18,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  // APP COLORS
+  static const Color lightBlue = Color(0xFF82CAFF);
+  static const Color steelBlue = Color(0xFF4682B4);
+  static const Color darkBlue = Color(0xFF234E70);
+  static const Color backgroundBlue = Color(0xFFF4FAFF);
+
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -85,75 +91,144 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const darkGreen = Color(0xFF1B5E20);
-    const mainGreen = Color(0xFF2E7D32);
-    const lightGreen = Color(0xFFE8F5E9);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FBF7),
+      backgroundColor: backgroundBlue,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28,
-              vertical: 24,
-            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: 500,
               ),
               child: Column(
                 children: [
+                  // =====================================================
+                  // HEADER / IMAGE SECTION
+                  // =====================================================
                   Container(
-                    width: 95,
-                    height: 95,
-                    decoration: BoxDecoration(
-                      color: lightGreen,
-                      borderRadius: BorderRadius.circular(28),
+                    width: double.infinity,
+                    height: 260,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          lightBlue,
+                          steelBlue,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(45),
+                        bottomRight: Radius.circular(45),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.shield_rounded,
-                      size: 58,
-                      color: mainGreen,
-                    ),
-                  ),
+                    child: Stack(
+                      children: [
+                        // Decorative circle
+                        Positioned(
+                          top: -50,
+                          right: -50,
+                          child: Container(
+                            width: 170,
+                            height: 170,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.20),
+                                width: 20,
+                              ),
+                            ),
+                          ),
+                        ),
 
-                  const SizedBox(height: 22),
+                        // Decorative circle
+                        Positioned(
+                          bottom: -60,
+                          left: -50,
+                          child: Container(
+                            width: 160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.08),
+                            ),
+                          ),
+                        ),
 
-                  const Text(
-                    'Gas Leakage Detector',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: darkGreen,
-                    ),
-                  ),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // ==========================================
+                              // TODO: ADD YOUR HEADER IMAGE HERE LATER
+                              //
+                              // Example:
+                              //
+                              // Image.asset(
+                              //   'assets/images/login_header.png',
+                              //   height: 110,
+                              // )
+                              //
+                              // ==========================================
 
-                  const SizedBox(height: 8),
+                              Container(
+                                width: 82,
+                                height: 82,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.95),
+                                  borderRadius: BorderRadius.circular(22),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.10),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.sensors_rounded,
+                                  size: 48,
+                                  color: steelBlue,
+                                ),
+                              ),
 
-                  Text(
-                    'Monitor. Detect. Stay Safe.',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                              const SizedBox(height: 16),
 
-                  const SizedBox(height: 38),
+                              const Text(
+                                'Gas Leakage Detector',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 27,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
 
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
+                              const SizedBox(height: 6),
+
+                              Text(
+                                'SMART GAS SAFETY MONITORING',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.85),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.8,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      28,
+                      32,
+                      28,
+                      30,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,50 +236,54 @@ class _LoginScreenState extends State<LoginScreen> {
                         const Text(
                           'Welcome Back',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 27,
                             fontWeight: FontWeight.bold,
-                            color: darkGreen,
+                            color: darkBlue,
                           ),
                         ),
 
-                        const SizedBox(height: 5),
+                        const SizedBox(height: 6),
 
                         Text(
-                          'Sign in to monitor your gas detector.',
+                          'Sign in to continue monitoring your system.',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey.shade600,
+                            color: Colors.blueGrey.shade500,
                           ),
                         ),
 
-                        const SizedBox(height: 25),
+                        const SizedBox(height: 30),
 
+                        // EMAIL
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'Email',
-                            hintText: 'Enter your email',
+                            hintText: 'Enter your email address',
                             prefixIcon: const Icon(
                               Icons.email_outlined,
-                              color: mainGreen,
+                              color: steelBlue,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFFF7FAF7),
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 18,
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.grey.shade300,
+                                color: lightBlue.withOpacity(0.55),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: mainGreen,
+                                color: steelBlue,
                                 width: 2,
                               ),
                             ),
@@ -213,15 +292,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 18),
 
+                        // PASSWORD
                         TextField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          onSubmitted: (_) {
+                            if (!_isLoading) {
+                              _login();
+                            }
+                          },
                           decoration: InputDecoration(
                             labelText: 'Password',
                             hintText: 'Enter your password',
                             prefixIcon: const Icon(
-                              Icons.lock_outline,
-                              color: mainGreen,
+                              Icons.lock_outline_rounded,
+                              color: steelBlue,
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
@@ -233,32 +318,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
+                                color: steelBlue,
                               ),
                             ),
                             filled: true,
-                            fillColor: const Color(0xFFF7FAF7),
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 18,
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.grey.shade300,
+                                color: lightBlue.withOpacity(0.55),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: mainGreen,
+                                color: steelBlue,
                                 width: 2,
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 5),
 
+                        // FORGOT PASSWORD
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -274,26 +364,30 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: const Text(
                               'Forgot Password?',
                               style: TextStyle(
-                                color: mainGreen,
+                                color: steelBlue,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
 
+                        // LOGIN BUTTON
                         SizedBox(
                           width: double.infinity,
-                          height: 55,
+                          height: 56,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: mainGreen,
+                              backgroundColor: steelBlue,
                               foregroundColor: Colors.white,
-                              elevation: 0,
+                              disabledBackgroundColor:
+                                  steelBlue.withOpacity(0.6),
+                              elevation: 3,
+                              shadowColor: steelBlue.withOpacity(0.3),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: _isLoading
@@ -301,63 +395,149 @@ class _LoginScreenState extends State<LoginScreen> {
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                                      strokeWidth: 2.5,
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
-                                    'LOG IN',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
+                                : const Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.login_rounded,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'LOG IN',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.7,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
+                        // DIVIDER
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
-                              "Don't have an account?",
-                              style: TextStyle(
-                                fontSize: 14,
+                            Expanded(
+                              child: Divider(
+                                color: Colors.blueGrey.shade200,
                               ),
                             ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const RegisterScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                'Register Here',
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 15),
+                              child: Text(
+                                'or',
                                 style: TextStyle(
-                                  color: mainGreen,
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blueGrey.shade500,
+                                  fontSize: 14,
                                 ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: Colors.blueGrey.shade200,
                               ),
                             ),
                           ],
                         ),
+
+                        const SizedBox(height: 28),
+
+                        // CREATE ACCOUNT
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const RegisterScreen(),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: steelBlue,
+                              backgroundColor:
+                                  lightBlue.withOpacity(0.12),
+                              side: const BorderSide(
+                                color: steelBlue,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.person_add_alt_1_rounded,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'CREATE NEW ACCOUNT',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 35),
+
+                        // FOOTER
+                        Center(
+                          child: Column(
+                            children: [
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.shield_outlined,
+                                    size: 16,
+                                    color: steelBlue,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Gas Leakage Safety Monitoring System',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: steelBlue,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              Text(
+                                'Monitor • Detect • Stay Safe',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blueGrey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Text(
-                    'Gas Leakage Safety Monitoring System',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
                     ),
                   ),
                 ],
