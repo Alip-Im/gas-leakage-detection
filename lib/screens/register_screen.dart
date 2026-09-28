@@ -207,24 +207,28 @@ Future<void> _continueWithGoogle() async {
     // ANDROID / IOS
     // =====================================================
 
-    else {
-      final GoogleSignInAccount googleUser =
-          await GoogleSignIn.instance.authenticate();
+else {
+  await GoogleSignIn.instance.initialize(
+    serverClientId:
+        '146541742460-1jsa3eqoqamm7imtfo36fam89pad4onk.apps.googleusercontent.com',
+  );
 
-      final GoogleSignInAuthentication googleAuth =
-          googleUser.authentication;
+  final GoogleSignInAccount googleUser =
+      await GoogleSignIn.instance.authenticate();
 
-      final OAuthCredential credential =
-          GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-      );
+  final GoogleSignInAuthentication googleAuth =
+      googleUser.authentication;
 
-      userCredential =
-          await FirebaseAuth.instance.signInWithCredential(
-        credential,
-      );
-    }
+  final OAuthCredential credential =
+      GoogleAuthProvider.credential(
+    idToken: googleAuth.idToken,
+  );
 
+  userCredential =
+      await FirebaseAuth.instance.signInWithCredential(
+    credential,
+  );
+}
     final User? user = userCredential.user;
 
     if (user == null) {
