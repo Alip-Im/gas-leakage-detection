@@ -1,6 +1,10 @@
+import 'contact_us_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+
+import 'edit_profile_screen.dart';
+import 'device_registration_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -12,360 +16,761 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState
     extends State<UserProfileScreen> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _postcodeController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseDatabase _database =
+      FirebaseDatabase.instance;
 
-  bool _isLoading = false;
-  bool _isFetching = true;
+  String _fullName = '';
+  String _phoneNumber = '';
+  String _city = '';
+  String _state = '';
+
+  bool _isLoading = true;
+
+  // =========================================================
+  // BLUE THEME
+  // =========================================================
+
+  static const Color lightBlue = Color(0xFF82CAFF);
+  static const Color steelBlue = Color(0xFF4682B4);
+  static const Color darkBlue = Color(0xFF234E70);
+  static const Color backgroundBlue = Color(0xFFF4FAFF);
+  static const Color cardBorder = Color(0xFFD8EAF6);
+  static const Color dangerRed = Color(0xFFC62828);
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadProfile();
   }
 
-  Future<void> _loadUserProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
+  // =========================================================
+  // LOAD PROFILE
+  // =========================================================
 
-    if (user != null) {
-      final ref =
-          FirebaseDatabase.instance.ref('users/${user.uid}');
+  Future<void> _loadProfile() async {
+    final user = _auth.currentUser;
 
-      final snapshot = await ref.get();
-
-      if (snapshot.exists && mounted) {
-        final data =
-            snapshot.value as Map<dynamic, dynamic>;
-
-        setState(() {
-          _nameController.text =
-              data['full_name'] ?? '';
-
-          _phoneController.text =
-              data['phone_number'] ?? '';
-
-          _addressController.text =
-              data['address_line'] ?? '';
-
-          _postcodeController.text =
-              data['postcode'] ?? '';
-
-          _cityController.text =
-              data['city'] ?? '';
-
-          _stateController.text =
-              data['state'] ?? '';
-        });
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isFetching = false;
-      });
-    }
-  }
-
-  Future<void> _saveUserProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final ref =
-          FirebaseDatabase.instance.ref('users/${user.uid}');
-
-      await ref.set({
-        'full_name': _nameController.text.trim(),
-        'phone_number': _phoneController.text.trim(),
-        'address_line': _addressController.text.trim(),
-        'postcode': _postcodeController.text.trim(),
-        'city': _cityController.text.trim(),
-        'state': _stateController.text.trim(),
-        'updated_at':
-            DateTime.now().toIso8601String(),
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Profile updated successfully!',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to update profile: $e',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
+    if (user == null) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
+      return;
+    }
+
+    try {
+      final snapshot =
+          await _database.ref('users/${user.uid}').get();
+
+      if (snapshot.exists &&
+          snapshot.value is Map) {
+        final data = Map<dynamic, dynamic>.from(
+          snapshot.value as Map,
+        );
+
+        if (mounted) {
+          setState(() {
+            _fullName =
+                data['full_name']?.toString() ?? '';
+
+            _phoneNumber =
+                data['phone_number']?.toString() ?? '';
+
+            _city =
+                data['city']?.toString() ?? '';
+
+            _state =
+                data['state']?.toString() ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to load profile information.',
+            ),
+          ),
+        );
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    _postcodeController.dispose();
-    _cityController.dispose();
-    _stateController.dispose();
-    super.dispose();
+  // =========================================================
+  // OPEN EDIT PROFILE
+  // =========================================================
+
+  Future<void> _openEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const EditProfileScreen(),
+      ),
+    );
+
+    // If Save Changes was successful,
+    // reload profile from Firebase.
+    if (result == true) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      await _loadProfile();
+    }
   }
+
+  // =========================================================
+  // OPEN DEVICE REGISTRATION
+  // =========================================================
+
+  Future<void> _openDeviceRegistration() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const DeviceRegistrationScreen(),
+      ),
+    );
+  }
+
+  // =========================================================
+// OPEN CONTACT US
+// =========================================================
+
+Future<void> _openContactUs() async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const ContactUsScreen(),
+    ),
+  );
+}
+
+  // =========================================================
+  // LOGOUT
+  // =========================================================
+
+  Future<void> _confirmLogout() async {
+    final bool? confirm =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(12),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                color: dangerRed,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Log Out',
+                style: TextStyle(
+                  color: darkBlue,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to log out of your account?',
+            style: TextStyle(
+              color: Colors.blueGrey,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(
+                  color: steelBlue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: dangerRed,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(7),
+                ),
+              ),
+              child: const Text(
+                'LOG OUT',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await _auth.signOut();
+    }
+  }
+
+  // =========================================================
+  // BUILD PAGE
+  // =========================================================
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final User? user = _auth.currentUser;
 
     return Scaffold(
+      backgroundColor: backgroundBlue,
+
+      // =====================================================
+      // APP BAR
+      // =====================================================
+
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
         title: const Text(
-          'Manage Profile',
+          'PROFILE',
           style: TextStyle(
-            color: Colors.white,
+            color: darkBlue,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
           ),
         ),
-        backgroundColor: Colors.indigo,
       ),
-      body: _isFetching
+
+      // =====================================================
+      // BODY
+      // =====================================================
+
+      body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: steelBlue,
+              ),
             )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Column(
-                      children: [
-                        const CircleAvatar(
-                          radius: 40,
-                          backgroundColor:
-                              Colors.indigo,
-                          child: Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.white,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        Text(
-                          user?.email ?? 'No Email',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+              padding: const EdgeInsets.fromLTRB(
+                18,
+                25,
+                18,
+                30,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(
+                    maxWidth: 700,
                   ),
-
-                  const SizedBox(height: 24),
-
-                  const Text(
-                    'Personal Information',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.indigo,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: _nameController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Full Name',
-                      prefixIcon:
-                          Icon(Icons.person_outline),
-                      border:
-                          OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType:
-                        TextInputType.phone,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Phone Number',
-                      prefixIcon:
-                          Icon(Icons.phone),
-                      border:
-                          OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  const Text(
-                    'Location & Address Details',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.indigo,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller:
-                        _addressController,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Street Address',
-                      prefixIcon:
-                          Icon(Icons.home),
-                      border:
-                          OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller:
-                              _postcodeController,
-                          keyboardType:
-                              TextInputType.number,
-                          decoration:
-                              const InputDecoration(
-                            labelText:
-                                'Postcode',
-                            border:
-                                OutlineInputBorder(),
+                      // =====================================
+                      // PROFILE HEADER
+                      // =====================================
+
+                      Container(
+                        width: double.infinity,
+                        padding:
+                            const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 28,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient:
+                              const LinearGradient(
+                            begin:
+                                Alignment.topLeft,
+                            end:
+                                Alignment.bottomRight,
+                            colors: [
+                              darkBlue,
+                              steelBlue,
+                              lightBlue,
+                            ],
                           ),
+                          borderRadius:
+                              BorderRadius.circular(
+                            12,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: steelBlue
+                                  .withOpacity(0.18),
+                              blurRadius: 14,
+                              offset:
+                                  const Offset(
+                                0,
+                                5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            // PROFILE ICON
+                            Container(
+                              width: 88,
+                              height: 88,
+                              decoration:
+                                  BoxDecoration(
+                                color: Colors.white,
+                                shape:
+                                    BoxShape.circle,
+                                border:
+                                    Border.all(
+                                  color: Colors.white
+                                      .withOpacity(
+                                    0.7,
+                                  ),
+                                  width: 3,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons
+                                    .person_rounded,
+                                color: steelBlue,
+                                size: 50,
+                              ),
+                            ),
+
+                            const SizedBox(
+                              height: 14,
+                            ),
+
+                            // NAME
+                            Text(
+                              _fullName
+                                      .trim()
+                                      .isEmpty
+                                  ? 'User'
+                                  : _fullName,
+                              textAlign:
+                                  TextAlign.center,
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.white,
+                                fontSize: 20,
+                                fontWeight:
+                                    FontWeight
+                                        .w800,
+                              ),
+                            ),
+
+                            const SizedBox(
+                              height: 5,
+                            ),
+
+                            // EMAIL
+                            Text(
+                              user?.email ??
+                                  'No email available',
+                              textAlign:
+                                  TextAlign.center,
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+
+                            // LOCATION
+                            if (_city.isNotEmpty ||
+                                _state.isNotEmpty) ...[
+                              const SizedBox(
+                                height: 12,
+                              ),
+                              Container(
+                                padding:
+                                    const EdgeInsets
+                                        .symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                decoration:
+                                    BoxDecoration(
+                                  color: Colors
+                                      .white
+                                      .withOpacity(
+                                    0.14,
+                                  ),
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    20,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize:
+                                      MainAxisSize
+                                          .min,
+                                  children: [
+                                    const Icon(
+                                      Icons
+                                          .location_on_outlined,
+                                      color: Colors
+                                          .white,
+                                      size: 15,
+                                    ),
+                                    const SizedBox(
+                                      width: 5,
+                                    ),
+                                    Text(
+                                      _locationText(),
+                                      style:
+                                          const TextStyle(
+                                        color: Colors
+                                            .white,
+                                        fontSize: 10,
+                                        fontWeight:
+                                            FontWeight
+                                                .w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
 
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 28),
 
-                      Expanded(
-                        child: TextField(
-                          controller:
-                              _cityController,
-                          decoration:
-                              const InputDecoration(
-                            labelText: 'City',
-                            border:
-                                OutlineInputBorder(),
+                      // =====================================
+                      // ACCOUNT TITLE
+                      // =====================================
+
+                      const Align(
+                        alignment:
+                            Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons
+                                  .manage_accounts_outlined,
+                              color: steelBlue,
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Account',
+                              style: TextStyle(
+                                color: darkBlue,
+                                fontSize: 15,
+                                fontWeight:
+                                    FontWeight
+                                        .w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // =====================================
+                      // ACCOUNT MENU
+                      // =====================================
+
+                      _menuCard(
+                        children: [
+                          _menuItem(
+                            icon: Icons
+                                .person_outline_rounded,
+                            title:
+                                'Edit Profile',
+                            subtitle:
+                                'Update your personal information',
+                            onTap:
+                                _openEditProfile,
                           ),
+
+                          _divider(),
+
+                          _menuItem(
+                            icon: Icons
+                                .add_to_home_screen_rounded,
+                            title:
+                                'Sign Up Your Device',
+                            subtitle:
+                                'Register your Gas Leakage Detector',
+                            onTap:
+                                _openDeviceRegistration,
+                          ),
+                        ],
+                      ),
+
+                      _divider(),
+
+                      _menuItem(
+                      icon: Icons.support_agent_outlined,
+                      title: 'Contact Us',
+                      subtitle: 'Get help or report an issue',
+                    onTap: _openContactUs,
+                    ),
+
+                      const SizedBox(height: 20),
+
+                      // =====================================
+                      // LOGOUT CARD
+                      // =====================================
+
+                      _menuCard(
+                        children: [
+                          _menuItem(
+                            icon:
+                                Icons.logout_rounded,
+                            title: 'Logout',
+                            subtitle:
+                                'Sign out from this account',
+                            iconColor:
+                                dangerRed,
+                            titleColor:
+                                dangerRed,
+                            onTap:
+                                _confirmLogout,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 35),
+
+                      // =====================================
+                      // APP INFORMATION
+                      // =====================================
+
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: lightBlue
+                              .withOpacity(0.15),
+                          borderRadius:
+                              BorderRadius.circular(
+                            12,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.sensors_rounded,
+                          color: steelBlue,
+                          size: 27,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      const Text(
+                        'Gas Leakage Detector',
+                        style: TextStyle(
+                          color: darkBlue,
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w700,
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      Text(
+                        'Version 1.0',
+                        style: TextStyle(
+                          color: Colors
+                              .blueGrey.shade400,
+                          fontSize: 10,
                         ),
                       ),
                     ],
                   ),
+                ),
+              ),
+            ),
+    );
+  }
 
-                  const SizedBox(height: 12),
+  // =========================================================
+  // LOCATION TEXT
+  // =========================================================
 
-                  TextField(
-                    controller:
-                        _stateController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'State',
-                      prefixIcon:
-                          Icon(Icons.map),
-                      border:
-                          OutlineInputBorder(),
+  String _locationText() {
+    if (_city.isNotEmpty &&
+        _state.isNotEmpty) {
+      return '$_city, $_state';
+    }
+
+    if (_city.isNotEmpty) {
+      return _city;
+    }
+
+    if (_state.isNotEmpty) {
+      return _state;
+    }
+
+    return '';
+  }
+
+  // =========================================================
+  // MENU CARD
+  // =========================================================
+
+  Widget _menuCard({
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(10),
+        border: Border.all(
+          color: cardBorder,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:
+                Colors.black.withOpacity(0.035),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: children,
+      ),
+    );
+  }
+
+  // =========================================================
+  // MENU ITEM
+  // =========================================================
+
+  Widget _menuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color iconColor = steelBlue,
+    Color titleColor = darkBlue,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius:
+          BorderRadius.circular(10),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        child: Row(
+          children: [
+            // ICON BOX
+            Container(
+              width: 43,
+              height: 43,
+              decoration: BoxDecoration(
+                color:
+                    iconColor.withOpacity(0.10),
+                borderRadius:
+                    BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 21,
+              ),
+            ),
+
+            const SizedBox(width: 14),
+
+            // TEXT
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: titleColor,
+                      fontSize: 14,
+                      fontWeight:
+                          FontWeight.w700,
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : _saveUserProfile,
-                    icon: const Icon(
-                      Icons.save,
-                      color: Colors.white,
-                    ),
-                    label: _isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
-                        : const Text(
-                            'SAVE PROFILE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                          ),
-                    style:
-                        ElevatedButton.styleFrom(
-                      minimumSize:
-                          const Size.fromHeight(50),
-                      backgroundColor:
-                          Colors.indigo,
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      FirebaseAuth.instance
-                          .signOut();
-                    },
-                    icon: const Icon(
-                      Icons.logout,
-                      color: Colors.red,
-                    ),
-                    label: const Text(
-                      'LOG OUT',
-                      style: TextStyle(
-                        color: Colors.red,
-                      ),
-                    ),
-                    style:
-                        OutlinedButton.styleFrom(
-                      minimumSize:
-                          const Size.fromHeight(50),
-                      side: const BorderSide(
-                        color: Colors.red,
-                      ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors
+                          .blueGrey.shade400,
+                      fontSize: 10,
                     ),
                   ),
                 ],
               ),
             ),
+
+            // ARROW
+            Icon(
+              Icons.chevron_right_rounded,
+              color:
+                  Colors.blueGrey.shade300,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =========================================================
+  // DIVIDER
+  // =========================================================
+
+  Widget _divider() {
+    return Divider(
+      height: 1,
+      indent: 73,
+      color: Colors.blueGrey.shade50,
     );
   }
 }
